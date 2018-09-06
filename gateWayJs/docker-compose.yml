@@ -1,0 +1,16 @@
+version: '3.0'
+
+services:
+  # consul server，对外暴露的ui接口为8500，只有在2台consul服务器的情况下集群才起作用
+  web-nodejs2:
+#    build: ./webNodejs
+    image: webapp:latest
+#    depends_on:
+#      - "registrator1"
+#      - "registrator2"
+#      - "registrator3"
+    ports:
+      - "3000"
+    environment:
+      SERVICE_3000_NAME: service-aaa
+

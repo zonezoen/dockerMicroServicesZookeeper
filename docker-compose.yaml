@@ -1,0 +1,182 @@
+version: '3.0'
+services:
+  # consul server，对外暴露的ui接口为8500，只有在2台consul服务器的情况下集群才起作用
+  zoo1:
+      image: zookeeper
+      restart: always
+      ports:
+          - 2181:2181
+      environment:
+          ZOO_MY_ID: 1
+          ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=zoo2:2888:3888 server.3=zoo3:2888:3888
+
+  zoo2:
+      image: zookeeper
+      restart: always
+      ports:
+          - 2182:2181
+      environment:
+          ZOO_MY_ID: 2
+          ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=zoo2:2888:3888 server.3=zoo3:2888:3888
+
+  zoo3:
+      image: zookeeper
+      restart: always
+      ports:
+          - 2183:2181
+      environment:
+          ZOO_MY_ID: 3
+          ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=zoo2:2888:3888 server.3=zoo3:2888:3888
+  registrator1:
+    image: gliderlabs/registrator
+    restart: always
+    depends_on:
+      - "zoo1"
+      - "zoo2"
+      - "zoo3"
+    network_mode: "host"
+    # -ip 设置服务写入注册中心的IP地址
+    # zookeeper:// 设置连接的 ZK 协议、地址、注册的根节点
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    command: "-ip 192.168.43.136 zookeeper://192.168.43.136:2181/services"
+
+  registrator2:
+    image: gliderlabs/registrator
+    restart: always
+    network_mode: "host"
+    depends_on:
+      - "zoo1"
+      - "zoo2"
+      - "zoo3"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    command: "-ip 192.168.43.136 zookeeper://192.168.43.136:2182/services"
+
+  registrator3:
+    image: gliderlabs/registrator
+    restart: always
+    network_mode: "host"
+    depends_on:
+      - "zoo1"
+      - "zoo2"
+      - "zoo3"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    command: "-ip 192.168.43.136 zookeeper://192.168.43.136:2183/services"
+
+
+
+
+  web-nodejs:
+    build: ./webNodejs
+    image: webapp:latest
+    depends_on:
+      - "registrator1"
+      - "registrator2"
+      - "registrator3"
+    ports:
+      - "3000"
+    environment:
+      SERVICE_3000_NAME: service-web
+#    network_mode: "host"
+    networks:
+      - app
+
+#  web-py:
+#    build: ./webPy
+#    image: webpy:latest
+#    depends_on:
+#      - "consulserver"
+#    ports:
+#      - "5000"
+#    environment:
+#      SERVICE_5000_NAME: service-web-py
+#    volumes:
+#      - ./webPy:/usr/local/work
+#    networks:
+#      - app
+#    command: bash -c "pip install -r requirements.txt && python app.py"
+
+  post-services-js:
+    build: ./moudel/moudelPost
+    image: webjs2:latest
+    depends_on:
+      - "registrator1"
+      - "registrator2"
+      - "registrator3"
+    volumes:
+      - ./moudel/moudelPost:/usr/local/work
+    ports:
+      - "3000"
+    environment:
+      SERVICE_3000_NAME: post-services-js
+#    network_mode: "host"
+    networks:
+      - app
+
+  user-services-py:
+    build: ./moudel/moudelUser
+    image: webpy2:latest
+    depends_on:
+      - "registrator1"
+      - "registrator2"
+      - "registrator3"
+#    hostname: userService
+    ports:
+      - "5000"
+    environment:
+      SERVICE_5000_NAME: user-service-py
+    volumes:
+      - ./moudel/moudelUser:/usr/local/work
+#    network_mode: "host"
+    networks:
+      - app
+#    command: bash -c "pip install -r requirements.txt && python server.py"
+
+#  gateway-py:
+#    build: ./gateWayPy
+#    image: gatewaypy:latest
+##    depends_on:
+##      - "consulserver"
+#    ports:
+#      - "5000:5000"
+#    environment:
+#      SERVICE_5000_NAME: service-gateway-py
+#    volumes:
+#      - ./gateWayPy:/usr/local/work
+#    networks:
+#      - app
+#    command: bash -c "pip install -r requirements.txt && python app.py"
+#
+#
+#
+  gateway-nodejs:
+    build: ./gateWayJs
+    image: gatewayjs:latest
+    depends_on:
+      - "registrator1"
+      - "registrator2"
+      - "registrator3"
+#    links:
+#      - user-services-py
+    volumes:
+      - ./gateWayJs:/usr/local/work
+    ports:
+      - "3000:3000"
+    environment:
+      SERVICE_3000_NAME: service-gateway-js
+#    network_mode: "host"
+    networks:
+      - app
+
+
+
+networks:
+  app:
+    driver: "bridge"
+
+#networks:
+#  app2:
+#    driver: "host"
+
